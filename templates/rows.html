@@ -1,0 +1,13 @@
+<div class="docs">
+  {% for item in items %}
+  <a class="doc" href="{{ url_for('voir', doc_id=item.id) if item.locked else url_for('modifier', doc_id=item.id) }}">
+    <span class="pill {{ item.badge }}">{{ item.etat }}</span>
+    <span>
+      <strong>{{ item.client }}</strong>
+      <small>{{ item.number or "Brouillon" }}{% if item.objet %} · {{ item.objet }}{% endif %}</small>
+    </span>
+    <span class="when">{{ date_fr(item.issue_date) or "—" }}</span>
+    <span class="money">{{ eur(item.total_ttc_cents) }}{% if item.reste > 0 %}<small>reste {{ eur(item.reste) }}</small>{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>

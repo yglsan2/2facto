@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set names = {"facture": "Factures", "devis": "Devis", "avoir": "Avoirs"} %}
+{% block title %}{{ names[kind] }} — 2facto{% endblock %}
+{% block body %}
+<header class="top">
+  <div>
+    <h1>{{ names[kind] }} {{ tip("En retard : l'échéance est passée et il reste un solde. Le brouillon se supprime sans créer de trou dans les numéros.") if kind == "facture" else tip("Le devis se fige quand vous l'émettez. La facture, plus tard, a son propre numéro.") if kind == "devis" else tip("L'avoir annule une facture émise. Il prend le numéro suivant des factures, pour qu'il n'y ait pas de trou.") }}</h1>
+  </div>
+  {% if kind != "avoir" %}
+  <a class="btn" href="{{ url_for('nouveau', kind=kind) }}">Nouveau</a>
+  {% else %}
+  <a class="btn ghost" href="{{ url_for('factures') }}">Retour aux factures</a>
+  {% endif %}
+</header>
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Client, numéro, objet">
+  {% if kind == "facture" %}
+    {% for key, label in [("","Toutes"),("brouillon","Brouillons"),("attente","À encaisser"),("retard","En retard"),("payee","Payées")] %}
+    <a class="{{ 'on' if filtre == key else '' }}" href="{{ url_for('factures', filtre=key, q=q) }}">{{ label }}</a>
+    {% endfor %}
+  {% elif kind == "devis" %}
+    {% for key, label in [("","Tous"),("brouillon","Brouillons"),("envoye","Envoyés"),("accepte","Acceptés"),("refuse","Refusés")] %}
+    <a class="{{ 'on' if filtre == key else '' }}" href="{{ url_for('devis', filtre=key, q=q) }}">{{ label }}</a>
+    {% endfor %}
+  {% endif %}
+</form>
+{% if items %}
+  {% include "rows.html" %}
+{% else %}
+<div class="empty">
+  <p>{% if q or filtre %}Aucun document dans cette vue.{% elif kind == "devis" %}Pas encore de devis.{% elif kind == "avoir" %}Pas encore d'avoir.{% else %}Pas encore de facture.{% endif %}</p>
+</div>
+{% endif %}
+{% if kind == "facture" %}
+<p class="foot"><a href="{{ url_for('avoirs') }}">Voir les avoirs</a> · <a href="{{ url_for('export_factures', annee=year) }}">Exporter {{ year }}</a></p>
+{% endif %}
+{% endblock %}

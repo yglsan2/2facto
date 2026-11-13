@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Réglages — 2facto{% endblock %}
+{% block body %}
+<header class="top">
+  <div>
+    <h1>Réglages</h1>
+    <p class="sub">Ce qui est déjà rempli convient à la création de sites et de logiciels. Changez seulement ce qui vous concerne.</p>
+  </div>
+</header>
+<form class="card form" method="post" action="{{ url_for('sauver_reglages') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Identité</h2>
+  <div class="grid2">
+    <label>Prénom<input name="prenom" required value="{{ company.prenom }}"></label>
+    <label>Nom<input name="nom" required value="{{ company.nom }}"></label>
+  </div>
+  <label>Nom commercial<input name="nom_commercial" value="{{ company.nom_commercial }}" placeholder="Facultatif, sous votre nom"></label>
+  <label>Adresse<input name="adresse" required value="{{ company.adresse }}"></label>
+  <label>Complément<input name="complement" value="{{ company.complement }}"></label>
+  <div class="grid2">
+    <label>Code postal<input name="code_postal" required value="{{ company.code_postal }}"></label>
+    <label>Ville<input name="ville" required value="{{ company.ville }}"></label>
+  </div>
+  <div class="grid2">
+    <label>E-mail<input type="email" name="email" required value="{{ company.email }}"></label>
+    <label>Téléphone<input name="telephone" value="{{ company.telephone }}"></label>
+  </div>
+  <div class="grid2">
+    <label>Site<input name="site" value="{{ company.site }}"></label>
+    <label>SIRET<input name="siret" required value="{{ company.siret }}"></label>
+  </div>
+  <label>Code APE<input name="code_ape" value="{{ company.code_ape }}" placeholder="6201Z"></label>
+  <h2>TVA {{ tip("En franchise, la mention de l'article 293 B est ajoutée toute seule. Ne la réécrivez pas.") }}</h2>
+  <label class="check"><input type="radio" name="regime_tva" value="franchise" {{ 'checked' if company.regime_tva != 'assujetti' else '' }}> Franchise en base</label>
+  <label class="check"><input type="radio" name="regime_tva" value="assujetti" {{ 'checked' if company.regime_tva == 'assujetti' else '' }}> TVA facturée</label>
+  <div class="grid2">
+    <label>Taux
+      <select name="taux_tva_bp">
+        {% for bp, label in ((2000, "20 %"), (1000, "10 %"), (550, "5,5 %"), (210, "2,1 %")) %}
+        <option value="{{ bp }}" {{ 'selected' if company.taux_tva_bp == bp else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="check tall"><input type="checkbox" name="option_debits" value="1" {{ 'checked' if company.option_debits else '' }}> Option des débits</label>
+  </div>
+  <h2>Paiement</h2>
+  <label>IBAN<input name="iban" value="{{ company.iban }}"></label>
+  <div class="grid2">
+    <label>BIC<input name="bic" value="{{ company.bic }}"></label>
+    <label>Titulaire<input name="titulaire" value="{{ company.titulaire }}"></label>
+  </div>
+  <div class="grid2">
+    <label>Échéance (jours)<input name="delai_jours" type="number" min="0" max="60" value="{{ company.delai_jours }}"></label>
+    <label>Validité d'un devis (jours)<input name="validite_devis" type="number" min="1" max="365" value="{{ company.validite_devis }}"></label>
+  </div>
+  <label>Pénalités {{ tip("Entre professionnels, les pénalités et l'indemnité de 40 € sont obligatoires. Le texte proposé est déjà conforme.") }}
+    <textarea name="penalites" rows="2">{{ company.penalites }}</textarea>
+  </label>
+  <label>Escompte<textarea name="escompte" rows="2">{{ company.escompte }}</textarea></label>
+  <h2>Activité</h2>
+  <label>Régime
+    <select name="activite">
+      {% for key, rate in rates.items() %}
+      <option value="{{ key }}" {{ 'selected' if company.activite == key else '' }}>{{ rate.label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>ACRE {{ tip("Laissez « non » si vous n'avez pas l'exonération. Le taux réduit n'est pas appliqué tout seul.") }}
+    <select name="acre">
+      <option value="non" {{ 'selected' if company.acre == 'non' else '' }}>Pas d'ACRE</option>
+      <option value="apres" {{ 'selected' if company.acre == 'apres' else '' }}>ACRE à partir du 1er juillet 2026</option>
+      <option value="avant" {{ 'selected' if company.acre == 'avant' else '' }}>ACRE avant le 1er juillet 2026</option>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="versement_liberatoire" value="1" {{ 'checked' if company.versement_liberatoire else '' }}> Versement libératoire de l'impôt</label>
+  <label>Déclaration
+    <select name="periodicite">
+      <option value="trimestre" {{ 'selected' if company.periodicite != 'mois' else '' }}>Trimestrielle</option>
+      <option value="mois" {{ 'selected' if company.periodicite == 'mois' else '' }}>Mensuelle</option>
+    </select>
+  </label>
+  <h2>Mentions</h2>
+  <label>Assurance<textarea name="assurance" rows="2" placeholder="Seulement si vous en avez une">{{ company.assurance }}</textarea></label>
+  <label>Médiateur<textarea name="mediateur" rows="2" placeholder="Pour les clients particuliers">{{ company.mediateur }}</textarea></label>
+  <label>Phrase en plus<textarea name="mention_libre" rows="2">{{ company.mention_libre }}</textarea></label>
+  <button class="btn">Enregistrer</button>
+</form>
+<section class="card form">
+  <h2>Prestations</h2>
+  {% if catalog %}
+  <ul class="pays">
+    {% for item in catalog %}
+    <li>
+      <span>{{ item.libelle }}</span>
+      <strong>{{ eur(item.prix_cents) }} · {{ unites[item.unite][0] }}</strong>
+      <form method="post" action="{{ url_for('prestation_off', item_id=item.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">Retirer</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form class="stack" method="post" action="{{ url_for('prestation_add') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Nom<input name="libelle" required></label>
+    <div class="grid2">
+      <label>Prix HT<input name="prix" required placeholder="800,00"></label>
+      <label>Unité
+        <select name="unite">{% for key, unit in unites.items() %}<option value="{{ key }}">{{ unit[0] }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    <button class="btn ghost">Ajouter</button>
+  </form>
+</section>
+<section class="card form">
+  <h2>Logo</h2>
+  <form method="post" action="{{ url_for('logo') }}" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="logo" accept="image/png,image/jpeg">
+    <button class="btn ghost">Enregistrer le logo</button>
+  </form>
+  {% if company.has_logo %}
+  <form method="post" action="{{ url_for('logo') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="retirer" value="1">
+    <button class="link">Retirer le logo</button>
+  </form>
+  {% endif %}
+</section>
+<section class="card form">
+  <h2>Conservation {{ tip("Une copie sur une clé ou un autre disque protège les dix années de conservation. Le fichier contient les factures et le journal.") }}</h2>
+  <p class="sub">Les factures émises restent dans 2facto. Téléchargez une copie de temps en temps.</p>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('sauvegarde') }}">Télécharger la sauvegarde</a>
+    <a class="btn ghost" href="{{ url_for('journal') }}">Journal</a>
+  </div>
+</section>
+{% endblock %}

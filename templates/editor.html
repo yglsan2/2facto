@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% set titles = {"facture": "Facture", "devis": "Devis", "avoir": "Avoir"} %}
+{% block title %}{{ titles[kind] }} — 2facto{% endblock %}
+{% block body %}
+{% set src = form if form else none %}
+<header class="top">
+  <div>
+    <h1>{% if doc and kind == "facture" %}Modifier la facture{% elif doc and kind == "devis" %}Modifier le devis{% elif doc %}Modifier l'avoir{% elif kind == "facture" %}Nouvelle facture{% elif kind == "devis" %}Nouveau devis{% else %}Nouvel avoir{% endif %}</h1>
+    {% set annee = (src.get('issue_date')[:4] if src and src.get('issue_date') else (doc.issue_date[:4] if doc and doc.issue_date else year|string)) %}
+    <p class="sub" id="next-num">Sera numéroté {{ numbers[annee] if annee in numbers else (numbers.values()|list|first) }} {{ tip("Le numéro n'est réservé qu'à l'émission. Supprimer ce brouillon ne crée pas de trou.") }}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('factures') if kind != 'devis' else url_for('devis') }}">Fermer</a>
+</header>
+{% if origin %}
+<p class="note">Avoir sur {{ origin.number }}. Reste annulable : {{ eur(room) }}.</p>
+{% endif %}
+<form id="editor" class="editor" method="post" action="{{ url_for('sauver') }}">
+  <div>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    {% if doc %}<input type="hidden" name="id" value="{{ doc.id }}">{% endif %}
+    {% if doc and doc.facture_id %}<input type="hidden" name="facture_id" value="{{ doc.facture_id }}">{% endif %}
+    <label>Client
+      <select name="client_id" required>
+        <option value="">Choisir</option>
+        {% for c in clients %}
+        <option value="{{ c.id }}" {{ 'selected' if (src and src.get('client_id')|string == c.id|string) or (not src and doc and doc.client_id == c.id) else '' }}>{{ c.nom }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="foot"><a href="{{ url_for('client_edit') }}">Nouveau client</a></p>
+    <label>Objet<input name="objet" value="{{ src.get('objet') if src else (doc.objet if doc else '') }}" placeholder="Création du site vitrine"></label>
+    <div class="grid2">
+      <label>Émission<input type="date" name="issue_date" id="issue" value="{{ src.get('issue_date') if src else (doc.issue_date if doc and doc.issue_date else year and '') }}"></label>
+      <label>Prestation {{ tip("Le jour où le travail est fini. S'il dure, mettez la fin dans Plus d'options.") }}
+        <input type="date" name="service_date" id="service" {% if kind != "devis" %}required{% endif %} value="{{ src.get('service_date') if src else (doc.service_date if doc else '') }}">
+      </label>
+    </div>
+    <div class="chips">
+      {% for item in catalog %}
+      <button type="button" class="chip" data-libelle="{{ item.libelle }}" data-prix="{{ '%d,%02d'|format(item.prix_cents // 100, item.prix_cents % 100) }}" data-unite="{{ item.unite }}">{{ item.libelle }}</button>
+      {% endfor %}
+      <button type="button" class="chip" data-libelle="Conception et réalisation d'un site internet" data-unite="forfait">Site internet</button>
+      <button type="button" class="chip" data-libelle="Développement d'un logiciel" data-unite="forfait">Logiciel</button>
+      <button type="button" class="chip" data-libelle="Journée de développement" data-unite="jour">Journée</button>
+    </div>
+    <div class="table-wrap">
+      <table class="lines" id="lines">
+        <thead>
+          <tr><th>Prestation</th><th>Qté</th><th>Unité</th><th>Prix HT</th><th>Remise</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% if src %}
+            {% for lib in src.getlist('libelle') %}
+            <tr>
+              <td><input name="libelle" value="{{ lib }}"></td>
+              <td><input name="quantite" value="{{ src.getlist('quantite')[loop.index0] }}"></td>
+              <td><select name="unite">{% for key, unit in unites.items() %}<option value="{{ key }}" {{ 'selected' if src.getlist('unite')[loop.index0] == key else '' }}>{{ unit[0] }}</option>{% endfor %}</select></td>
+              <td><input name="prix" value="{{ src.getlist('prix')[loop.index0] }}"></td>
+              <td><input name="remise" value="{{ src.getlist('remise')[loop.index0] }}"></td>
+              <td><button type="button" class="icon drop" aria-label="Retirer">×</button></td>
+            </tr>
+            {% endfor %}
+          {% elif lines %}
+            {% for line in lines %}
+            <tr>
+              <td><input name="libelle" value="{{ line.libelle }}"></td>
+              <td><input name="quantite" value="{{ '%g'|format(line.qty_bp / 100) }}"></td>
+              <td><select name="unite">{% for key, unit in unites.items() %}<option value="{{ key }}" {{ 'selected' if line.unite == key else '' }}>{{ unit[0] }}</option>{% endfor %}</select></td>
+              <td><input name="prix" value="{{ '%d,%02d'|format(line.prix_cents // 100, line.prix_cents % 100) }}"></td>
+              <td><input name="remise" value="{{ '%g'|format(line.remise_bp / 100) }}"></td>
+              <td><button type="button" class="icon drop" aria-label="Retirer">×</button></td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td><input name="libelle" placeholder="Prestation"></td>
+              <td><input name="quantite" value="1"></td>
+              <td><select name="unite">{% for key, unit in unites.items() %}<option value="{{ key }}">{{ unit[0] }}</option>{% endfor %}</select></td>
+              <td><input name="prix" placeholder="0,00"></td>
+              <td><input name="remise" value="0"></td>
+              <td><button type="button" class="icon drop" aria-label="Retirer">×</button></td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn ghost" id="add-line">Ajouter une ligne</button>
+    <details>
+      <summary>Plus d'options</summary>
+      <div class="stack">
+        <div class="grid2">
+          <label>Fin de prestation<input type="date" name="service_end" value="{{ src.get('service_end') if src else (doc.service_end if doc else '') }}"></label>
+          {% if kind == "facture" %}
+          <label>Échéance<input type="date" name="due_date" id="due" data-auto="{{ '0' if (src and src.get('due_date')) or (doc and doc.due_date) else '1' }}" value="{{ src.get('due_date') if src else (doc.due_date if doc else '') }}"></label>
+          {% elif kind == "devis" %}
+          <label>Valable jusqu'au<input type="date" name="valid_until" value="{{ src.get('valid_until') if src else (doc.valid_until if doc else '') }}"></label>
+          {% endif %}
+        </div>
+        <label>Bon de commande<input name="bon_commande" value="{{ src.get('bon_commande') if src else (doc.bon_commande if doc else '') }}"></label>
+        {% set nature = src.get('nature') if src else (doc.nature if doc else 'prestation') %}
+        <label>Nature {{ tip("Pour un site ou un logiciel, laissez prestation de services.") }}
+          <select name="nature" id="nature">
+            {% for key, label in natures.items() %}
+            <option value="{{ key }}" {{ 'selected' if key == nature else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Remise globale %<input name="remise_globale" id="remise" value="{{ src.get('remise_globale') if src else ((doc.remise_bp / 100)|round(2) if doc else '0') }}"></label>
+        <p class="sub">Livraison, seulement si elle diffère de l'adresse du client.</p>
+        <label>Adresse<input name="livraison_adresse" value="{{ src.get('livraison_adresse') if src else (doc.livraison_adresse if doc else '') }}"></label>
+        <div class="grid2">
+          <label>Code postal<input name="livraison_cp" value="{{ src.get('livraison_cp') if src else (doc.livraison_cp if doc else '') }}"></label>
+          <label>Ville<input name="livraison_ville" value="{{ src.get('livraison_ville') if src else (doc.livraison_ville if doc else '') }}"></label>
+        </div>
+        <label>Note imprimée<textarea name="notes" rows="2">{{ src.get('notes') if src else (doc.notes if doc else '') }}</textarea></label>
+      </div>
+    </details>
+    <div class="payline"><span>Net à payer</span><strong id="net">0,00 €</strong></div>
+    <div class="actions">
+      <button class="btn ghost" name="action" value="sauver">Enregistrer</button>
+      <button class="btn" name="action" value="emettre" data-confirm="Émettre fige ce document et lui donne son numéro. Il ne pourra plus être modifié. Continuer ?">Émettre</button>
+      {{ tip("Après ça, une erreur se corrige par un avoir, puis une nouvelle facture. Pas en réécrivant celle-ci.") }}
+    </div>
+    {% if doc %}
+    <p class="foot"><a href="{{ url_for('pdf', doc_id=doc.id) }}" target="_blank" rel="noopener">Aperçu PDF</a></p>
+    {% endif %}
+  </div>
+  <aside class="preview">
+    <article class="sheet" id="sheet" aria-live="polite"></article>
+  </aside>
+</form>
+{% if doc %}
+<form method="post" action="{{ url_for('supprimer', doc_id=doc.id) }}" class="foot" data-confirm-form="Supprimer ce brouillon ?">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="link">Supprimer le brouillon</button>
+</form>
+{% endif %}
+<template id="line-tpl">
+  <tr>
+    <td><input name="libelle" placeholder="Prestation"></td>
+    <td><input name="quantite" value="1"></td>
+    <td><select name="unite">{% for key, unit in unites.items() %}<option value="{{ key }}">{{ unit[0] }}</option>{% endfor %}</select></td>
+    <td><input name="prix" placeholder="0,00"></td>
+    <td><input name="remise" value="0"></td>
+    <td><button type="button" class="icon drop" aria-label="Retirer">×</button></td>
+  </tr>
+</template>
+<script id="preview-data" type="application/json">{{ preview|tojson }}</script>
+{% endblock %}

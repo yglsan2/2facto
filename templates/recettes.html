@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Recettes — 2facto{% endblock %}
+{% block body %}
+<header class="top">
+  <div>
+    <h1>Recettes {{ annee }} {{ tip("Le livre reprend les encaissements, pas les factures envoyées. Gardez-le avec vos pièces pendant dix ans.") }}</h1>
+    <p class="sub">Estimation Urssaf {{ eur(stats.cotisations) }} {{ tip("Taux indicatif sur l'encaissé hors taxes. Vérifiez le montant sur autoentrepreneur.urssaf.fr avant de déclarer.") }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="{{ url_for('export_recettes', annee=annee) }}">CSV</a>
+    <a class="btn" href="{{ url_for('recettes_pdf', annee=annee) }}">PDF</a>
+  </div>
+</header>
+<nav class="filters">
+  <a href="{{ url_for('recettes', annee=annee - 1) }}">{{ annee - 1 }}</a>
+  <a class="on" href="{{ url_for('recettes', annee=annee) }}">{{ annee }}</a>
+  <a href="{{ url_for('recettes', annee=annee + 1) }}">{{ annee + 1 }}</a>
+</nav>
+<section class="kpis">
+  <article class="kpi hero">
+    <p>Encaissé</p>
+    <strong>{{ eur(stats.encaisse) }}</strong>
+    <span>hors taxes, base de la déclaration</span>
+  </article>
+  <article class="kpi">
+    <p>Cotisations</p>
+    <strong>{{ eur(stats.social) }}</strong>
+    <span>{{ rate_label(stats.rate.social) }}</span>
+  </article>
+  <article class="kpi">
+    <p>Impôt libératoire</p>
+    <strong>{{ eur(stats.impot) }}</strong>
+    <span>{% if stats.rate.vl %}{{ rate_label(stats.rate.vl) }}{% else %}non appliqué{% endif %}</span>
+  </article>
+</section>
+<div class="periods">
+  {% for p in stats.periods %}
+  <article class="{{ 'on' if p.current else '' }}">
+    <p>{{ p.label }}</p>
+    <strong>{{ eur(p.encaisse) }}</strong>
+    <small>env. {{ eur(p.cotisations) }}</small>
+  </article>
+  {% endfor %}
+</div>
+{% if stats.book %}
+<div class="table-wrap">
+  <table class="book">
+    <thead><tr><th>Date</th><th>Client</th><th>Nature</th><th>Pièce</th><th>Mode</th><th>Montant</th></tr></thead>
+    <tbody>
+      {% for row in stats.book %}
+      <tr>
+        <td>{{ date_fr(row.paid_on) }}</td>
+        <td>{{ row.client }}</td>
+        <td>{{ row.objet or "Prestation" }}</td>
+        <td>{{ row.number }}</td>
+        <td>{{ row.mode }}</td>
+        <td>{{ eur(row.amount_cents) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty"><p>Aucun encaissement en {{ annee }}. Une facture payée apparaît ici, à la date où l'argent est arrivé.</p></div>
+{% endif %}
+{% endblock %}

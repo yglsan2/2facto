@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Client — 2facto{% endblock %}
+{% block body %}
+{% set f = form if form else none %}
+<header class="top">
+  <div><h1>{{ "Client" if client else "Nouveau client" }}</h1></div>
+  <a class="btn ghost" href="{{ url_for('clients') }}">Retour</a>
+</header>
+<form class="card form" method="post">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <fieldset>
+    <legend>Type {{ tip("Professionnel : société, association ou autre indépendant. Le SIRET est alors obligatoire pour une entreprise française. Particulier : une personne qui n'achète pas pour son activité.") }}</legend>
+    {% set kind = f.get('type') if f else (client.type if client else 'professionnel') %}
+    <label class="check"><input type="radio" name="type" value="professionnel" {{ 'checked' if kind != 'particulier' else '' }}> Professionnel</label>
+    <label class="check"><input type="radio" name="type" value="particulier" {{ 'checked' if kind == 'particulier' else '' }}> Particulier</label>
+  </fieldset>
+  <label>Nom<input name="nom" required value="{{ f.get('nom') if f else (client.nom if client else '') }}"></label>
+  <label>Contact<input name="contact" value="{{ f.get('contact') if f else (client.contact if client else '') }}" placeholder="Personne à écrire"></label>
+  <label>Adresse<input name="adresse" value="{{ f.get('adresse') if f else (client.adresse if client else '') }}"></label>
+  <label>Complément<input name="complement" value="{{ f.get('complement') if f else (client.complement if client else '') }}"></label>
+  <div class="grid2">
+    <label>Code postal<input name="code_postal" value="{{ f.get('code_postal') if f else (client.code_postal if client else '') }}"></label>
+    <label>Ville<input name="ville" value="{{ f.get('ville') if f else (client.ville if client else '') }}"></label>
+  </div>
+  <div class="grid2">
+    <label>Pays<input name="pays" value="{{ f.get('pays') if f else (client.pays if client else 'FR') }}" maxlength="2"></label>
+    <label>SIRET {{ tip("Obligatoire pour émettre une facture à une entreprise française. Laissez vide pour un particulier ou un client étranger.") }}
+      <input name="siret" value="{{ f.get('siret') if f else (client.siret if client else '') }}">
+    </label>
+  </div>
+  <div class="grid2">
+    <label>E-mail<input type="email" name="email" value="{{ f.get('email') if f else (client.email if client else '') }}"></label>
+    <label>Téléphone<input name="telephone" value="{{ f.get('telephone') if f else (client.telephone if client else '') }}"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="masquer_adresse" value="1" {{ 'checked' if (f and f.get('masquer_adresse')) or (client and client.masquer_adresse) else '' }}> Ne pas imprimer l'adresse {{ tip("Un particulier peut s'y opposer. L'adresse reste dans 2facto.") }}</label>
+  <label>Note interne<textarea name="notes" rows="2">{{ f.get('notes') if f else (client.notes if client else '') }}</textarea></label>
+  <button class="btn">Enregistrer</button>
+</form>
+{% if client %}
+<form method="post" action="{{ url_for('client_delete', client_id=client.id) }}" data-confirm-form="Retirer ce client ?">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="link">Retirer ce client</button>
+</form>
+{% endif %}
+{% endblock %}

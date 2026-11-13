@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Journal — 2facto{% endblock %}
+{% block body %}
+<header class="top">
+  <div>
+    <h1>Journal {{ tip("Chaque création, émission, paiement et annulation est ajouté ici. Une ligne écrite ne se modifie pas, et chaque ligne reprend l'empreinte de la précédente.") }}</h1>
+  </div>
+  <a class="btn ghost" href="{{ url_for('reglages') }}">Réglages</a>
+</header>
+<form method="post" action="{{ url_for('verifier') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn">Vérifier la chaîne</button>
+</form>
+{% if problemes %}
+<ul class="flash err">
+  {% for item in problemes %}<li>{{ item }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if rows %}
+<ol class="journal">
+  {% for row in rows %}
+  <li>
+    <time>{{ row.at|replace("T", " ")|replace("Z", "") }}</time>
+    <p>{{ row.message }}</p>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<div class="empty"><p>Le journal est vide. Il commence à la première création.</p></div>
+{% endif %}
+{% endblock %}

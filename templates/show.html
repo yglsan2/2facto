@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.number or "Document" }} — 2facto{% endblock %}
+{% block body %}
+<header class="top">
+  <div>
+    <h1>{{ doc.number }} <span class="pill {{ doc.badge }}">{{ doc.etat }}</span></h1>
+    <p class="sub">{{ client.nom }}{% if doc.objet %} · {{ doc.objet }}{% endif %}</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('factures') if doc.kind != 'devis' else url_for('devis') }}">Retour</a>
+</header>
+<div class="show">
+  <iframe class="frame" title="Document" src="{{ url_for('pdf', doc_id=doc.id) }}"></iframe>
+  <aside class="panel">
+    {% if doc.kind == "facture" %}
+      {% if doc.reste > 0 %}
+      <p class="due">Reste {{ eur(doc.reste) }}</p>
+      <form method="post" action="{{ url_for('payer', doc_id=doc.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="montant_cents" value="{{ doc.reste }}">
+        <input type="hidden" name="mode" value="virement">
+        <input type="hidden" name="date" value="{{ today }}">
+        <button class="btn">Marquer comme payée</button>
+        {{ tip("À faire le jour où l'argent est sur le compte. C'est cette date qui entre dans le livre des recettes.") }}
+      </form>
+      <details>
+        <summary>Autre montant, date ou mode</summary>
+        <form class="stack" method="post" action="{{ url_for('payer', doc_id=doc.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Montant<input name="montant" required></label>
+          <label>Date<input type="date" name="date" value="{{ today }}" required></label>
+          <label>Mode<select name="mode">{% for key, label in modes.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+          <button class="btn ghost">Enregistrer</button>
+        </form>
+      </details>
+      {% elif doc.paye > 0 and doc.avoirs_cents >= doc.total_ttc_cents %}
+      <p class="flash err">Cette facture est annulée, mais un encaissement est encore noté.</p>
+      <form method="post" action="{{ url_for('payer', doc_id=doc.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="montant_cents" value="{{ -doc.paye }}">
+        <input type="hidden" name="mode" value="virement">
+        <input type="hidden" name="date" value="{{ today }}">
+        <input type="hidden" name="note" value="Remboursement">
+        <button class="btn">Enregistrer le remboursement</button>
+      </form>
+      {% else %}
+      <p class="due">{{ doc.etat }}</p>
+      {% endif %}
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('pdf', doc_id=doc.id, dl=1) }}">Télécharger le PDF {{ tip("Le fichier des factures et avoirs contient déjà le Factur-X : la page lisible et les données pour les logiciels. L'envoi par une plateforme agréée deviendra obligatoire le 1er septembre 2027 pour les clients professionnels. 2facto prépare le fichier, il ne l'envoie pas.") if doc.kind != "devis" else tip("Joignez ce PDF au message. Le devis émis ne se réécrit plus : dupliquez-le pour une nouvelle version.") }}</a>
+    {% if doc.kind != "devis" and doc.xml is defined %}{% endif %}
+    {% if doc.kind != "devis" %}
+    <a class="link" href="{{ url_for('xml', doc_id=doc.id) }}">Télécharger le XML</a>
+    {% endif %}
+    {% if lettres and client.email %}
+    <a class="link" href="mailto:{{ client.email }}?subject={{ lettres.envoi_sujet|urlencode }}&body={{ lettres.envoi|urlencode }}">Écrire au client</a>
+    {% endif %}
+    {% if doc.kind == "devis" %}
+    <form method="post" action="{{ url_for('transformer', doc_id=doc.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn">Transformer en facture</button>
+    </form>
+    {% if doc.status != "transforme" %}
+    <form method="post" action="{{ url_for('statut', doc_id=doc.id) }}" class="row-actions">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn ghost" name="statut" value="accepte">Accepté</button>
+      <button class="btn ghost" name="statut" value="refuse">Refusé</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if doc.kind == "facture" and doc.avoirs_cents < doc.total_ttc_cents %}
+    <details>
+      <summary>Annuler et refaire {{ tip("La facture émise ne se corrige pas. L'avoir l'annule avec le numéro suivant, puis un brouillon neuf est préparé.") }}</summary>
+      <form method="post" action="{{ url_for('corriger', doc_id=doc.id) }}" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <p>Un avoir va annuler {{ doc.number }}. Vous pourrez corriger la nouvelle facture avant de l'émettre.</p>
+        {% if doc.paye > 0 %}
+        <label class="check"><input type="checkbox" name="rembourser" value="1" checked> Noter le remboursement de {{ eur(doc.paye) }}</label>
+        {% endif %}
+        <button class="btn">Continuer</button>
+      </form>
+    </details>
+    <form method="post" action="{{ url_for('avoir', doc_id=doc.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Avoir partiel</button>
+    </form>
+    {% endif %}
+    {% if doc.kind != "avoir" %}
+    <form method="post" action="{{ url_for('dupliquer', doc_id=doc.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Dupliquer</button>
+    </form>
+    {% endif %}
+    {% if payments %}
+    <h2>Encaissements</h2>
+    <ul class="pays">
+      {% for p in payments %}
+      <li>
+        <span>{{ date_fr(p.paid_on) }} · {{ modes[p.method] }}</span>
+        <strong>{{ eur(p.amount_cents) }}</strong>
+        {% if p.note %}<small>{{ p.note }}</small>{% endif %}
+        {% if not p.cancels_id and p.id not in cancelled %}
+        <form method="post" action="{{ url_for('annuler_paiement', doc_id=doc.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="payment_id" value="{{ p.id }}">
+          <input name="motif" placeholder="Motif" required>
+          <button class="link">Annuler la ligne</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if lettres and doc.kind == "facture" and doc.reste > 0 %}
+    <details>
+      <summary>Relancer {{ tip("Le texte est prêt. Copiez-le et joignez le PDF. 2facto n'envoie rien tout seul.") }}</summary>
+      <label>Rappel<textarea id="relance" rows="8" readonly>{{ lettres.relance }}</textarea></label>
+      <button type="button" class="btn ghost" data-copy="#relance">Copier</button>
+      <label>Plus ferme<textarea id="ferme" rows="8" readonly>{{ lettres.ferme }}</textarea></label>
+      <button type="button" class="btn ghost" data-copy="#ferme">Copier</button>
+    </details>
+    {% endif %}
+    {% if avoirs %}
+    <h2>Avoirs</h2>
+    {% for a in avoirs %}
+    <a href="{{ url_for('voir', doc_id=a.id) if a.locked else url_for('modifier', doc_id=a.id) }}">{{ a.number or "Brouillon" }} · {{ eur(a.total_ttc_cents) }}</a>
+    {% endfor %}
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

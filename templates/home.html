@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Accueil — 2facto{% endblock %}
+{% block body %}
+{% if setup %}
+{% set f = form if form else none %}
+<header class="top">
+  <div>
+    <h1>Votre activité</h1>
+    <p class="sub">Quatre informations suffisent pour une première facture. Le reste a déjà une valeur adaptée aux services.</p>
+  </div>
+</header>
+<form class="card form" method="post" action="{{ url_for('demarrage') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="grid2">
+    <label>Prénom<input name="prenom" required value="{{ f.get('prenom') if f else company.prenom }}" autocomplete="given-name"></label>
+    <label>Nom<input name="nom" required value="{{ f.get('nom') if f else company.nom }}" autocomplete="family-name"></label>
+  </div>
+  <label>Adresse<input name="adresse" required value="{{ f.get('adresse') if f else company.adresse }}" autocomplete="street-address"></label>
+  <div class="grid2">
+    <label>Code postal<input name="code_postal" required value="{{ f.get('code_postal') if f else company.code_postal }}" autocomplete="postal-code"></label>
+    <label>Ville<input name="ville" required value="{{ f.get('ville') if f else company.ville }}" autocomplete="address-level2"></label>
+  </div>
+  <label>E-mail<input name="email" type="email" required value="{{ f.get('email') if f else company.email }}" autocomplete="email"></label>
+  <label>SIRET {{ tip("14 chiffres, sur l'avis de situation Sirene. Le SIREN, ce sont les 9 premiers. Il rend la facture opposable.") }}
+    <input name="siret" inputmode="numeric" required value="{{ f.get('siret') if f else company.siret }}" placeholder="123 456 789 00012">
+  </label>
+  <fieldset>
+    <legend>TVA {{ tip("Laissez la franchise si vous ne facturez pas la TVA. La mention « article 293 B » est ajoutée toute seule.") }}</legend>
+    {% set regime = f.get('regime_tva') if f else company.regime_tva %}
+    <label class="check"><input type="radio" name="regime_tva" value="franchise" {{ 'checked' if regime != 'assujetti' else '' }}> Franchise en base, sans TVA</label>
+    <label class="check"><input type="radio" name="regime_tva" value="assujetti" {{ 'checked' if regime == 'assujetti' else '' }}> Je facture la TVA</label>
+  </fieldset>
+  <label>IBAN {{ tip("Facultatif pour commencer. Dès qu'il est là, il s'imprime sur la facture.") }}
+    <input name="iban" value="{{ f.get('iban') if f else company.iban }}" placeholder="FR76 ..." autocomplete="off">
+  </label>
+  <button class="btn">Enregistrer</button>
+</form>
+{% else %}
+<header class="top">
+  <div>
+    <h1>Bonjour {{ company.prenom }}</h1>
+    <p class="sub">{{ company.prenom }} {{ company.nom }}, entrepreneur individuel</p>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="{{ url_for('nouveau', kind='devis') }}">Nouveau devis</a>
+    <a class="btn" href="{{ url_for('nouveau', kind='facture') }}">Nouvelle facture</a>
+  </div>
+</header>
+<section class="kpis">
+  <article class="kpi hero">
+    <p>Encaissé en {{ year }} {{ tip("C'est cette somme que vous déclarez à l'Urssaf, pas le total des factures envoyées.") }}</p>
+    <strong>{{ eur(stats.encaisse) }}</strong>
+    <span>Estimation {{ eur(stats.cotisations) }} · {{ rate_social }}{% if rate.vl %} + {{ rate_vl }} d'impôt{% endif %}</span>
+  </article>
+  <article class="kpi">
+    <p>À encaisser</p>
+    <strong>{{ eur(open_.waiting) }}</strong>
+    <span>{% if open_.late_n %}dont {{ eur(open_.late_cents) }} en retard{% else %}rien en retard{% endif %}</span>
+  </article>
+  <article class="kpi">
+    <p>Facturé</p>
+    <strong>{{ eur(stats.facture_ht) }}</strong>
+    <span>hors taxes, avoirs déduits</span>
+  </article>
+</section>
+<section class="card bars">
+  <div>
+    <p>Franchise de TVA {{ tip("Repères 2026 pour les services : 37 500 €, puis 41 250 €. Ce n'est pas un avis fiscal. Un début d'année peut se calculer au prorata.") }}</p>
+    <div class="track"><span style="width: {{ [100, (stats.encaisse * 100 / rate.tva_maj)|round]|min }}%"></span></div>
+    <small>{{ eur(stats.encaisse) }} sur {{ eur(rate.tva_maj) }}</small>
+  </div>
+  <div>
+    <p>Plafond micro {{ tip("83 600 € de services pour 2026-2028, sur une année complète.") }}</p>
+    <div class="track soft"><span style="width: {{ [100, (stats.encaisse * 100 / rate.micro)|round]|min }}%"></span></div>
+    <small>{{ eur(stats.encaisse) }} sur {{ eur(rate.micro) }}</small>
+  </div>
+</section>
+{% if recent %}
+<section class="block">
+  <h2>Dernières factures</h2>
+  {% set items = recent %}
+  {% include "rows.html" %}
+</section>
+{% else %}
+<div class="empty">
+  <p>Aucune facture pour l'instant. Un devis si le client doit accepter, une facture si le travail est fait.</p>
+  <a class="btn" href="{{ url_for('nouveau', kind='facture') }}">Créer une facture</a>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

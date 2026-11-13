@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}2facto{% endblock %}</title>
+  <script>if(localStorage.getItem("2facto-aide")==="0")document.documentElement.classList.add("aide-off");</script>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='mark.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <a class="brand" href="{{ url_for('home') }}"><img src="{{ url_for('static', filename='logo.png') }}" alt="2facto"></a>
+      <nav>
+        <a class="{{ 'on' if request.endpoint == 'home' else '' }}" href="{{ url_for('home') }}">Accueil</a>
+        <a class="{{ 'on' if request.endpoint == 'factures' else '' }}" href="{{ url_for('factures') }}">Factures{% if retard %}<b>{{ retard }}</b>{% endif %}</a>
+        <a class="{{ 'on' if request.endpoint == 'devis' else '' }}" href="{{ url_for('devis') }}">Devis</a>
+        <a class="{{ 'on' if request.endpoint == 'clients' else '' }}" href="{{ url_for('clients') }}">Clients</a>
+        <a class="{{ 'on' if request.endpoint == 'recettes' else '' }}" href="{{ url_for('recettes') }}">Recettes</a>
+        <a class="{{ 'on' if request.endpoint == 'reglages' else '' }}" href="{{ url_for('reglages') }}">Réglages</a>
+      </nav>
+      <button type="button" id="aide" aria-pressed="true" title="Masquer ou afficher les conseils">Conseils</button>
+      <p class="side-note">Dès le 1<sup>er</sup> septembre 2027, l'envoi aux professionnels passe par une plateforme agréée. 2facto prépare le fichier, il ne l'envoie pas.</p>
+    </aside>
+    <main class="main">
+      <div class="wrap">
+        {% if coach and coach.href != request.path %}
+        <aside class="guide{% if coach.quiet %} quiet{% endif %}">
+          <p>{{ coach.text }}</p>
+          {% if coach.cta and coach.href %}
+          <a class="btn small" href="{{ coach.href }}">{{ coach.cta }}</a>
+          {% endif %}
+        </aside>
+        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in messages %}
+          <p class="flash {{ cat }}" role="status">{{ msg }}</p>
+          {% endfor %}
+        {% endwith %}
+        {% block body %}{% endblock %}
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
